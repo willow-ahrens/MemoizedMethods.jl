@@ -149,7 +149,7 @@ macro memoize(args...)
         local $result = Base.@__doc__($(combinedef(def)))
 
         local $brain = if isdefined($__module__, :__Memoize_brain__)
-            brain = getfield($__module__, :__Memoize_brain__)
+            getfield($__module__, :__Memoize_brain__)
         else
             global __Memoize_brain__ = Dict()
         end
