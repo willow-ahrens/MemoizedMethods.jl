@@ -1,4 +1,4 @@
-using Memoize, Test
+using Memoize, Test, Pkg
 
 @test_throws LoadError eval(:(@memoize))
 @test_throws LoadError eval(:(@memoize () = ()))
@@ -29,7 +29,7 @@ end
 @test simple(6) == 6
 @test run == 2
 
-empty!(memoize_cache(simple))
+map(forget!, methods(simple))
 @test simple(6) == 6
 @test run == 3
 @test simple(6) == 6
@@ -254,6 +254,80 @@ end
 outer()
 @test !@isdefined inner
 
+function outer_overwrite(y)
+    run = 0
+    @memoize function inner(x)
+        run += 1
+        (x, y, run)
+    end
+    #note that calling inner here would result in an error,
+    #since both definitions of inner are evaluated before the
+    #body of outer_overwrite runs, and the cache for the second definition
+    #of inner has not been set up yet.
+    @memoize function inner(x)
+        run += 1
+        (x + 1, y, run)
+    end
+    @test inner(5) == (6, y, 1)
+    @test run == 1
+    @test inner(5) == (6, y, 1)
+    @test run == 1
+    @test inner(6) == (7, y, 2)
+    @test run == 2
+    @memoize function inner(x::String)
+        run += 1
+        (x, y, run)
+    end
+    return inner
+end
+
+inner_1 = outer_overwrite(7)
+inner_2 = outer_overwrite(42)
+@test inner_1(5) == (6, 7, 1)
+@test inner_1(6) == (7, 7, 2)
+@test inner_1(7) == (8, 7, 3)
+@test inner_1("hello") == ("hello", 7, 4)
+@test inner_2(7) == (8, 42, 3)
+@test inner_2(5) == (6, 42, 1)
+@test inner_2(6) == (7, 42, 2)
+@test inner_2("goodbye") == ("goodbye", 42, 4)
+@test inner_2("hello") == ("hello", 42, 5)
+forget!(inner_1, Tuple{Any})
+@test inner_1(5) == (6, 7, 5)
+@test inner_2(6) == (7, 42, 2)
+@test inner_1("hello") == ("hello", 7, 4)
+
+genrun = 0
+@memoize function genspec(a)
+    global genrun += 1
+    a + 1
+end
+specrun = 0
+@test genspec(5) == 6
+@test genrun == 1
+@test specrun == 0
+@memoize function genspec(a::Int)
+    global specrun += 1
+    a + 2
+end
+@test genspec(5) == 7
+@test genrun == 1
+@test specrun == 1
+@test genspec(5) == 7
+@test genrun == 1
+@test specrun == 1
+@test genspec(true) == 2
+@test genrun == 2
+@test specrun == 1
+@test invoke(genspec, Tuple{Any}, 5) == 6
+@test genrun == 2
+@test specrun == 1
+
+map(forget!, methods(genspec, Tuple{Int}))
+@test genspec(5) == 7
+@test genrun == 2
+@test specrun == 2
+
 @memoize function typeinf(x)
     x + 1
 end
@@ -328,15 +402,30 @@ end # module
 using .MemoizeTest
 using .MemoizeTest: custom_dict
 
-empty!(memoize_cache(custom_dict))
+map(forget!, methods(custom_dict))
 @test custom_dict(1) == 1
 @test MemoizeTest.run == 3
 @test custom_dict(1) == 1
 @test MemoizeTest.run == 3
 
-empty!(memoize_cache(MemoizeTest.custom_dict))
+map(forget!, methods(MemoizeTest.custom_dict))
 @test custom_dict(1) == 1
 @test MemoizeTest.run == 4
+
+Pkg.activate(temp=true)
+Pkg.develop(path=joinpath(@__DIR__, "TestPrecompile"))
+using TestPrecompile
+
+@test TestPrecompile.run == 1
+@test TestPrecompile.forgetful(1)
+@test TestPrecompile.run == 1
+
+Pkg.develop(path=joinpath(@__DIR__, "TestPrecompile2"))
+using TestPrecompile2
+
+@test TestPrecompile.run == 1
+@test TestPrecompile.forgetful(2)
+@test TestPrecompile.run == 2
 
 run = 0
 @memoize Dict{Tuple{String},Int}() function dict_call(a::String)::Int
@@ -352,3 +441,5 @@ end
 @test dict_call("bb") == 2
 @test run == 2
 
+@memoize non_allocating(x) = x+1
+@test @allocated(non_allocating(10)) == 0

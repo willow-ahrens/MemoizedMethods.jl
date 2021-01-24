@@ -6,7 +6,7 @@
 [ci-img]: https://github.com/JuliaCollections/Memoize.jl/workflows/CI/badge.svg
 [ci-url]: https://github.com/JuliaCollections/Memoize.jl/actions
 
-Easy memoization for Julia.
+Easy method memoization for Julia.
 
 ## Usage
 
@@ -23,15 +23,16 @@ julia> x(1)
 Running
 2
 
-julia> memoize_cache(x)
-IdDict{Any,Any} with 1 entry:
-  (1,) => 2
+julia> memories(x)
+1-element Array{Any,1}:
+ IdDict{Any,Any}((1,) => 2)
 
 julia> x(1)
 2
 
-julia> empty!(memoize_cache(x))
-IdDict{Any,Any}()
+julia> map(empty!, memories(x))
+1-element Array{IdDict{Tuple{Any},Any},1}:
+ IdDict()
 
 julia> x(1)
 Running
