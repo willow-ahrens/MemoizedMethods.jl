@@ -485,7 +485,7 @@ end
 @test run == 2
 
 run = 0
-@memoize function vararg_func(list::Vararg{Tuple{Int64,Int64}})
+@memoize function vararg_func(list::Vararg{Tuple{Int,Int}})
     global run += 1
     return list[1]
 end
