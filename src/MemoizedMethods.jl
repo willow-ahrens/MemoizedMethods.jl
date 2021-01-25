@@ -68,28 +68,28 @@ macro memoize(args...)
     kwargs = split.(def[:kwargs], true)
     def[:args] = combine.(args)
     def[:kwargs] = combine.(kwargs)
-    @gensym inner
-    inner_def = deepcopy(def)
-    inner_def[:name] = inner
-    inner_args = copy(args)
-    inner_kwargs = copy(kwargs)
-    pop!(inner_def, :params, nothing)
+    @gensym inferrable
+    inferrable_def = deepcopy(def)
+    inferrable_def[:name] = inferrable
+    inferrable_args = copy(args)
+    inferrable_kwargs = copy(kwargs)
+    pop!(inferrable_def, :params, nothing)
     @gensym result
 
     anon = false
     name = nothing
     # If this is a method of a callable type or object, the definition returns nothing.
     # Thus, we must construct the type of the method on our own.
-    # We also need to pass the object to the inner function
+    # We also need to pass the object to the inferrable function
     if haskey(def, :name)
         if haskey(def, :params) # Callable type
             typ = :($(def[:name]){$(pop!(def, :params)...)})
-            inner_args = [split(:(::Type{$typ})), inner_args...]
-            def[:name] = combine(inner_args[1])
+            inferrable_args = [split(:(::Type{$typ})), inferrable_args...]
+            def[:name] = combine(inferrable_args[1])
             head = :(Type{$typ})
         elseif @capture(def[:name], obj_::obj_type_ | ::obj_type_) # Callable object
-            inner_args = [split(def[:name]), inner_args...]
-            def[:name] = combine(inner_args[1])
+            inferrable_args = [split(def[:name]), inferrable_args...]
+            def[:name] = combine(inferrable_args[1])
             head = obj_type
         else # Normal call
             head = :(typeof($(def[:name])))
@@ -99,13 +99,13 @@ macro memoize(args...)
         head = :(typeof($result))
         anon=true
     end
-    inner_def[:args] = combine.(inner_args)
+    inferrable_def[:args] = combine.(inferrable_args)
 
     # Set up arguments for memo key
-    key_names = map([inner_args; inner_kwargs]) do arg
+    key_names = map([inferrable_args; inferrable_kwargs]) do arg
         arg.trait ? arg.arg_type : arg.arg_name
     end
-    key_types = map([inner_args; inner_kwargs]) do arg
+    key_types = map([inferrable_args; inferrable_kwargs]) do arg
         arg.trait ? DataType :
         arg.vararg ? :(Tuple{$(arg.arg_type)}) :
             arg.arg_type
@@ -113,21 +113,21 @@ macro memoize(args...)
 
     cache = gensym(:__cache__)
 
-    pass_args = pass.(inner_args)
-    pass_kwargs = pass.(inner_kwargs)
+    pass_args = pass.(inferrable_args)
+    pass_kwargs = pass.(inferrable_kwargs)
     def[:body] = quote
-        $(combinedef(inner_def))
         get!($cache[2], ($(key_names...),)) do
-            $inner($(pass_args...); $(pass_kwargs...))
+            $(def[:body])
         end
     end
+
 
     # A return type declaration of Any is a No-op because everything is <: Any
     return_type = get(def, :rtype, Any)
 
     if length(kwargs) == 0
         def[:body] = quote
-            $(def[:body])::Core.Compiler.widenconst(Core.Compiler.return_type($inner, typeof(($(pass_args...),))))
+            $(def[:body])::Core.Compiler.widenconst(Core.Compiler.return_type($inferrable, typeof(($(pass_args...),))))
         end
     end
 
@@ -161,6 +161,7 @@ macro memoize(args...)
             end
         end)
 
+        $(esc(combinedef(inferrable_def)))
         local $(esc(result)) = Base.@__doc__($(esc(combinedef(def))))
 
         if isdefined($__module__, $(QuoteNode(scope)))

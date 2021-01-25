@@ -30,7 +30,6 @@ end
 @test run == 2
 
 map(forget!, methods(simple))
-println(__memories__)
 @test simple(6) == 6
 @test run == 3
 @test simple(6) == 6
