@@ -179,14 +179,16 @@ macro memoize(args...)
         $(esc(combinedef(inferrable_def)))
         local $(esc(result)) = Base.@__doc__($(esc(combinedef(def))))
 
-        if isdefined($__module__, $(QuoteNode(scope)))
-            if !isdefined($__module__, :__memories__)
-                $(esc(:__memories__)) = IdDict()
+        $(anon ? :() : quote
+            if isdefined($__module__, $(QuoteNode(scope)))
+                if !isdefined($__module__, :__memories__)
+                    $(esc(:__memories__)) = IdDict()
+                end
+                # Store the cache so that it can be emptied later
+                local meth = $_which($(esc(sig)))
+                $(esc(:__memories__))[meth.sig] = $(esc(cache))
             end
-            # Store the cache so that it can be emptied later
-            local meth = $_which($(esc(sig)))
-            $(esc(:__memories__))[meth.sig] = $(esc(cache))
-        end
+        end)
 
         $(esc(result))
     end

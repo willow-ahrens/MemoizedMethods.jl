@@ -49,7 +49,7 @@ end
 @test lambda(6) == 6
 @test run == 2
 
-map(forget!, methods(lambda))
+forget!(lambda, Tuple{Any})
 @test lambda(6) == 6
 @test run == 3
 @test lambda(6) == 6
