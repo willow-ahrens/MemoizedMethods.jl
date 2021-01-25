@@ -136,7 +136,7 @@ macro memoize(args...)
 
     scope = gensym()
 
-    res = quote
+    quote
         # The `local` qualifier will make this performant even in the global scope.
         $(esc(quote
             local $cache = begin
@@ -175,8 +175,6 @@ macro memoize(args...)
 
         $(esc(result))
     end
-    #println(res)
-    res
 end
 
 """
