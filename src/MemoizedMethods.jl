@@ -2,6 +2,8 @@ module MemoizedMethods
 using MacroTools: isexpr, combinearg, combinedef, namify, splitarg, splitdef, @capture
 export @memoize, forget!
 
+const salt = :__UYTBOOUDVEWICBEWNMDO__ #Symbol(:__, join(rand('A':'Z', 20)), :__)
+
 # which($sig) becomes available in Julia 1.6, so here's a workaround
 function _which(tt, world=typemax(UInt))
     meth = ccall(:jl_gf_invoke_lookup, Any, (Any, UInt), tt, world)
@@ -105,7 +107,7 @@ macro memoize(args...)
             #dispatch identically. Naming them after the same function
             #name ensures that the symbol is defined when it needs to be.
             if def[:name] isa Symbol 
-                inferrable = Symbol(def[:name], "__inferrable__")
+                inferrable = Symbol(def[:name], :__inferrable__)
             end
         end
         sig = :(Tuple{$head, $(dispatch.(args)...)} where {$(def[:whereparams]...)})
