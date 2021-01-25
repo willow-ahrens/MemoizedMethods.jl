@@ -76,8 +76,6 @@ macro memoize(args...)
     pop!(inferrable_def, :params, nothing)
     @gensym result
 
-    anon = false
-    name = nothing
     # If this is a method of a callable type or object, the definition returns nothing.
     # Thus, we must construct the type of the method on our own.
     # We also need to pass the object to the inferrable function
@@ -95,10 +93,12 @@ macro memoize(args...)
             head = :(typeof($(def[:name])))
             name = def[:name]
         end
+        sig = :(Tuple{$head, $(dispatch.(args)...)} where {$(def[:whereparams]...)})
     else # Anonymous function
         head = :(typeof($result))
-        anon=true
     end
+    tail = :(Tuple{$(dispatch.(args)...)} where {$(def[:whereparams]...)})
+
     inferrable_def[:args] = combine.(inferrable_args)
 
     # Set up arguments for memo key
@@ -120,7 +120,6 @@ macro memoize(args...)
             $(def[:body])
         end
     end
-
 
     # A return type declaration of Any is a No-op because everything is <: Any
     return_type = get(def, :rtype, Any)
@@ -146,8 +145,6 @@ macro memoize(args...)
         end
     end
 
-    sig = :(Tuple{$head, $(dispatch.(args)...)} where {$(def[:whereparams]...)})
-    tail = :(Tuple{$(dispatch.(args)...)} where {$(def[:whereparams]...)})
 
     scope = gensym()
 
@@ -163,15 +160,19 @@ macro memoize(args...)
 
         $(esc(scope)) = nothing
 
-        $(anon ? :() : quote
-            if isdefined($__module__, $(QuoteNode(scope)))
-                $(name != nothing ? esc(:(function $name end)) : :())
+        $(if @isdefined sig
+            quote
+                if isdefined($__module__, $(QuoteNode(scope)))
+                    $(if @isdefined name
+                        esc(:(function $name end))
+                    end)
 
-                # If overwriting a method, empty the old cache.
-                # Notice that methods are hashed by their stored signature
-                local meth = $_which($(esc(sig)))
-                if meth != nothing && meth.sig == $(esc(sig)) && isdefined(meth.module, :__memories__)
-                    empty!(pop!(meth.module.__memories__, meth.sig, (nothing, []))[2])
+                    # If overwriting a method, empty the old cache.
+                    # Notice that methods are hashed by their stored signature
+                    local meth = $_which($(esc(sig)))
+                    if meth != nothing && meth.sig == $(esc(sig)) && isdefined(meth.module, :__memories__)
+                        empty!(pop!(meth.module.__memories__, meth.sig, (nothing, []))[2])
+                    end
                 end
             end
         end)
@@ -179,14 +180,16 @@ macro memoize(args...)
         $(esc(combinedef(inferrable_def)))
         local $(esc(result)) = Base.@__doc__($(esc(combinedef(def))))
 
-        $(anon ? :() : quote
-            if isdefined($__module__, $(QuoteNode(scope)))
-                if !isdefined($__module__, :__memories__)
-                    $(esc(:__memories__)) = IdDict()
+        $(if @isdefined sig
+            quote
+                if isdefined($__module__, $(QuoteNode(scope)))
+                    if !isdefined($__module__, :__memories__)
+                        $(esc(:__memories__)) = IdDict()
+                    end
+                    # Store the cache so that it can be emptied later
+                    local meth = $_which($(esc(sig)))
+                    $(esc(:__memories__))[meth.sig] = $(esc(cache))
                 end
-                # Store the cache so that it can be emptied later
-                local meth = $_which($(esc(sig)))
-                $(esc(:__memories__))[meth.sig] = $(esc(cache))
             end
         end)
 
