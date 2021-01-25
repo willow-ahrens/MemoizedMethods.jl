@@ -125,6 +125,21 @@ macro memoize(args...)
     # A return type declaration of Any is a No-op because everything is <: Any
     return_type = get(def, :rtype, Any)
 
+    #=
+    To improve inference in kwarg cases, might want to look into these functions
+    @which f(1; k=2)
+    return_type = InteractiveUtils.gen_call_with_extracted_types(Main, :(Core.Compiler.return_type), :($inferrable()))
+        #= /Users/Peter/Projects/julia/usr/share/julia/stdlib/v1.5/InteractiveUtils/src/macros.jl:86 =#
+        local arg1 = $(Expr(:escape, :f))
+        #= /Users/Peter/Projects/julia/usr/share/julia/stdlib/v1.5/InteractiveUtils/src/macros.jl:87 =#
+        local (args, kwargs) = (InteractiveUtils.separate_kwargs)($(Expr(:escape, :($(Expr(:parameters, :($(Expr(:kw, :k, 2)))))))), $(Expr(:escape, 1)))
+        #= /Users/Peter/Projects/julia/usr/share/julia/stdlib/v1.5/InteractiveUtils/src/macros.jl:88 =#
+        Core.Complier.return_type(Core.kwfunc(arg1), Tuple{typeof(kwargs), Core.Typeof(arg1), map(Core.Typeof, args)...}; )
+
+    Core.kwfunc(arg1)   
+    :($(Expr(:parameters, :($(Expr(:kw, :k, 2)))))))
+    =#
+
     if length(kwargs) == 0
         def[:body] = quote
             $(def[:body])::Core.Compiler.widenconst(Core.Compiler.return_type($inferrable, typeof(($(pass_args...),))))
