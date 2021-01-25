@@ -135,45 +135,46 @@ macro memoize(args...)
     tail = :(Tuple{$(dispatch.(args)...)} where {$(def[:whereparams]...)})
 
     scope = gensym()
-    meth = gensym("meth")
 
-    res = esc(quote
+    res = quote
         # The `local` qualifier will make this performant even in the global scope.
-        local $cache = begin
-            local __Key__ = (Tuple{$(key_types...)} where {$(def[:whereparams]...)})
-            local __Value__ = ($return_type where {$(def[:whereparams]...)})
-            ($tail, $cache_constructor)
-        end
+        $(esc(quote
+            local $cache = begin
+                local __Key__ = (Tuple{$(key_types...)} where {$(def[:whereparams]...)})
+                local __Value__ = ($return_type where {$(def[:whereparams]...)})
+                ($tail, $cache_constructor)
+            end
+        end))
 
-        $scope = nothing
+        $(esc(scope)) = nothing
 
         $(anon ? :() : quote
             if isdefined($__module__, $(QuoteNode(scope)))
-                $(name != nothing ? :(function $name end) : :())
+                $(name != nothing ? esc(:(function $name end)) : :())
 
                 # If overwriting a method, empty the old cache.
                 # Notice that methods are hashed by their stored signature
-                local $meth = $_which($sig)
-                if $meth != nothing && $meth.sig == $sig && isdefined($meth.module, :__memories__)
-                    empty!(pop!($meth.module.__memories__, $meth.sig, (nothing, []))[2])
+                local meth = $_which($(esc(sig)))
+                if meth != nothing && meth.sig == $(esc(sig)) && isdefined(meth.module, :__memories__)
+                    empty!(pop!(meth.module.__memories__, meth.sig, (nothing, []))[2])
                 end
             end
         end)
 
-        local $result = Base.@__doc__($(combinedef(def)))
+        local $(esc(result)) = Base.@__doc__($(esc(combinedef(def))))
 
         if isdefined($__module__, $(QuoteNode(scope)))
-            if !@isdefined __memories__
-                __memories__ = IdDict()
+            if !isdefined($__module__, :__memories__)
+                $(esc(:__memories__)) = IdDict()
             end
             # Store the cache so that it can be emptied later
-            local $meth = $_which($sig)
-            __memories__[$meth.sig] = $cache
+            local meth = $_which($(esc(sig)))
+            $(esc(:__memories__))[meth.sig] = $(esc(cache))
         end
 
-        $result
-    end)
-    println(res)
+        $(esc(result))
+    end
+    #println(res)
     res
 end
 
