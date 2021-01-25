@@ -1,10 +1,10 @@
-module MemoizedMethods
+module Memoize
 using MacroTools: isexpr, combinearg, combinedef, namify, splitarg, splitdef, @capture
-export @memoize, forget!
+export @memoize, memories, memory
 
-# which($sig) becomes available in Julia 1.6, so here's a workaround
-function _which(tt)
-    meth = ccall(:jl_gf_invoke_lookup, Any, (Any, UInt), tt, typemax(UInt))
+# I would call which($sig) but it's only on 1.6 I think
+function _which(tt, world = typemax(UInt))
+    meth = ccall(:jl_gf_invoke_lookup, Any, (Any, UInt), tt, world)
     if meth !== nothing
         if meth isa Method
             return meth::Method
@@ -39,7 +39,7 @@ macro memoize(args...)
     catch
         error("@memoize must be applied to a method definition")
     end
-
+    
     function split(arg, iskwarg=false)
         arg_name, arg_type, slurp, default = splitarg(arg)
         trait = arg_name === nothing
@@ -74,10 +74,9 @@ macro memoize(args...)
     inner_args = copy(args)
     inner_kwargs = copy(kwargs)
     pop!(inner_def, :params, nothing)
+
     @gensym result
 
-    anon = false
-    name = nothing
     # If this is a method of a callable type or object, the definition returns nothing.
     # Thus, we must construct the type of the method on our own.
     # We also need to pass the object to the inner function
@@ -93,11 +92,9 @@ macro memoize(args...)
             head = obj_type
         else # Normal call
             head = :(typeof($(def[:name])))
-            name = def[:name]
         end
     else # Anonymous function
         head = :(typeof($result))
-        anon=true
     end
     inner_def[:args] = combine.(inner_args)
 
@@ -111,13 +108,13 @@ macro memoize(args...)
             arg.arg_type
     end
 
-    cache = gensym(:__cache__)
+    @gensym cache
 
     pass_args = pass.(inner_args)
     pass_kwargs = pass.(inner_kwargs)
     def[:body] = quote
         $(combinedef(inner_def))
-        get!($cache[2], ($(key_names...),)) do
+        get!($cache, ($(key_names...),)) do
             $inner($(pass_args...); $(pass_kwargs...))
         end
     end
@@ -131,80 +128,83 @@ macro memoize(args...)
         end
     end
 
+    @gensym world
+    @gensym old_meth
+    @gensym meth
+    @gensym brain
+    @gensym old_brain
+
     sig = :(Tuple{$head, $(dispatch.(args)...)} where {$(def[:whereparams]...)})
-    tail = :(Tuple{$(dispatch.(args)...)} where {$(def[:whereparams]...)})
 
-    scope = gensym()
-    meth = gensym("meth")
-
-    res = esc(quote
+    return esc(quote
         # The `local` qualifier will make this performant even in the global scope.
         local $cache = begin
             local __Key__ = (Tuple{$(key_types...)} where {$(def[:whereparams]...)})
             local __Value__ = ($return_type where {$(def[:whereparams]...)})
-            ($tail, $cache_constructor)
+            $cache_constructor
         end
 
-        $scope = nothing
-
-        $(anon ? :() : quote
-            if isdefined($__module__, $(QuoteNode(scope)))
-                $(name != nothing ? :(function $name end) : :())
-
-                # If overwriting a method, empty the old cache.
-                # Notice that methods are hashed by their stored signature
-                local $meth = $_which($sig)
-                if $meth != nothing && $meth.sig == $sig && isdefined($meth.module, :__memories__)
-                    empty!(pop!($meth.module.__memories__, $meth.sig, (nothing, []))[2])
-                end
-            end
-        end)
+        local $world = Base.get_world_counter()
 
         local $result = Base.@__doc__($(combinedef(def)))
 
-        if isdefined($__module__, $(QuoteNode(scope)))
-            if !@isdefined __memories__
-                __memories__ = IdDict()
-            end
-            # Store the cache so that it can be emptied later
-            local $meth = $_which($sig)
-            __memories__[$meth.sig] = $cache
+        local $brain = if isdefined($__module__, :__Memoize_brain__)
+            getfield($__module__, :__Memoize_brain__)
+        else
+            global __Memoize_brain__ = Dict()
         end
+        
+        # If overwriting a method, empty the old cache.
+        # Notice that methods are hashed by their stored signature
+        local $old_meth = $_which($sig, $world)
+        if $old_meth !== nothing && $old_meth.sig == $sig
+            if isdefined($old_meth.module, :__Memoize_brain__)
+                $old_brain = getfield($old_meth.module, :__Memoize_brain__)
+                empty!(pop!($old_brain, $old_meth.sig, []))
+            end
+        end
+
+        # Store the cache so that it can be emptied later
+        local $meth = $_which($sig)
+        @assert $meth !== nothing
+        $brain[$meth.sig] = $cache
 
         $result
     end)
-    println(res)
-    res
 end
 
 """
-    forget!(f, types)
+    memories(f, [types], [module])
     
-    If the method `which(f, types)`, is memoized, `empty!` its cache in the
-    scope of `f`.
+    Return an array of memoized method caches for the function f.
+    
+    This function takes the same arguments as the method methods.
 """
-function forget!(f, types)
-    for name in propertynames(f) #if f is a closure, we walk its fields
-        if first(string(name), length("##__cache__")) == "##__cache__"
-            cache = getproperty(f, name)
-            if cache isa Core.Box
-                cache = cache.contents
+memories(f, args...) = _memories(methods(f, args...))
+
+function _memories(ms::Base.MethodList)
+    memories = []
+    for m in ms
+        if isdefined(m.module, :__Memoize_brain__)
+            brain = getfield(m.module, :__Memoize_brain__)
+            memory = get(brain, m.sig, nothing)
+            if memory !== nothing
+                push!(memories, memory)
             end
-            (cache[1] == types) && empty!(cache[2])
         end
     end
-    forget!(which(f, types)) #otherwise, a method would suffice
+    return memories
 end
 
 """
-    forget!(m::Method)
+    memory(m)
     
-    If m, defined at global scope, is a memoized function, `empty!` its
-    cache.
+    Return the memoized cache for the method m, or nothing if no such method exists
 """
-function forget!(m::Method)
-    if isdefined(m.module, :__memories__)
-        empty!(get(m.module.__memories__, m.sig, (nothing, []))[2])
+function memory(m::Method)
+    if isdefined(m.module, :__Memoize_brain__)
+        brain = getfield(m.module, :__Memoize_brain__)
+        return get(brain, m.sig, nothing)
     end
 end
 

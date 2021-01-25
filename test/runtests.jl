@@ -36,6 +36,26 @@ map(forget!, methods(simple))
 @test run == 3
 
 run = 0
+lambda = @memoize (a) -> begin
+    global run += 1
+    a
+end
+@test lambda(5) == 5
+@test run == 1
+@test lambda(5) == 5
+@test run == 1
+@test lambda(6) == 6
+@test run == 2
+@test lambda(6) == 6
+@test run == 2
+
+map(forget!, methods(lambda))
+@test lambda(6) == 6
+@test run == 3
+@test lambda(6) == 6
+@test run == 3
+
+run = 0
 @memoize function typed(a::Int)
     global run += 1
     a
@@ -183,7 +203,7 @@ end
 @test run == 2
 
 run = 0
-@memoize Dict function kw_ellipsis(;a...)
+@memoize Dict() function kw_ellipsis(;a...)
     global run += 1
     a
 end
@@ -297,6 +317,106 @@ forget!(inner_1, Tuple{Any})
 @test inner_2(6) == (7, 42, 2)
 @test inner_1("hello") == ("hello", 7, 4)
 
+trait_function(a, ::Bool) = (-a,)
+run = 0
+@memoize function trait_function(a, ::Int)
+    global run += 1
+    (a,)
+end
+@test trait_function(1, true) == (-1,)
+@test run == 0
+@test trait_function(2, true) == (-2,)
+@test run == 0
+@test trait_function(1, 1) == (1,)
+@test run == 1
+@test trait_function(1, 2) == (1,)
+@test run == 1
+@test trait_function(2, 2) == (2,)
+@test run == 2
+@test trait_function(2, 2) == (2,)
+@test run == 2
+
+run = 0
+@memoize function trait_params(a, ::T) where {T}
+    global run += 1
+    (a, T)
+end
+@test trait_params(1, true) == (1, Bool)
+@test run == 1
+@test trait_params(1, false) == (1, Bool)
+@test run == 1
+@test trait_params(2, true) == (2, Bool)
+@test run == 2
+@test trait_params(2, false) == (2, Bool)
+@test run == 2
+@test trait_params(1, 3) == (1, Int)
+@test run == 3
+@test trait_params(1, 4) == (1, Int)
+@test run == 3
+
+run = 0
+struct callable_object
+    a
+end
+@memoize function (o::callable_object)(b)
+    global run += 1
+    (o.a, b)
+end
+@test callable_object(1)(2) == (1, 2)
+@test run == 1
+@test callable_object(1)(2) == (1, 2)
+@test run == 1
+@test callable_object(1)(3) == (1, 3)
+@test run == 2
+@test callable_object(1)(3) == (1, 3)
+@test run == 2
+@test callable_object(2)(3) == (2, 3)
+@test run == 3
+@test callable_object(2)(3) == (2, 3)
+@test run == 3
+
+run = 0
+struct callable_trait_object{T}
+    a::T
+end
+@memoize function (::callable_trait_object{T})(b) where {T}
+    global run += 1
+    (T, b)
+end
+@test callable_trait_object(1)(2) == (Int, 2)
+@test run == 1
+@test callable_trait_object(2)(2) == (Int, 2)
+@test run == 1
+@test callable_trait_object(false)(2) == (Bool, 2)
+@test run == 2
+@test callable_trait_object(true)(3) == (Bool, 3)
+@test run == 3
+@test callable_trait_object(1)(3) == (Int, 3)
+@test run == 4
+@test callable_trait_object(2)(3) == (Int, 3)
+@test run == 4
+
+run = 0
+struct callable_type{T}
+    a::T
+end
+@memoize function callable_type{T}(b) where {T}
+    global run += 1
+    (T, b)
+end
+@test callable_type{Int}(2) == (Int, 2)
+@test run == 1
+@test callable_type{Int}(2) == (Int, 2)
+@test run == 1
+@test callable_type{Int}(3) == (Int, 3)
+@test run == 2
+@test callable_type{Int}(3) == (Int, 3)
+@test run == 2
+@test callable_type{Bool}(3) == (Bool, 3)
+@test run == 3
+@test callable_type{Bool}(3) == (Bool, 3)
+@test run == 3
+
 genrun = 0
 @memoize function genspec(a)
     global genrun += 1
@@ -341,6 +461,9 @@ finalized = false
     x
 end
 method_rewrite()
+@memoize function method_rewrite(x) end
+GC.gc()
+@test !finalized
 @memoize function method_rewrite() end
 GC.gc()
 @test finalized
@@ -382,7 +505,7 @@ using MemoizedMethods
 const MyDict = Dict
 
 run = 0
-@memoize MyDict function custom_dict(a)
+@memoize MyDict() function custom_dict(a)
     global run += 1
     a
 end
@@ -439,7 +562,21 @@ end
 @test dict_call("bb") == 2
 @test run == 2
 @test dict_call("bb") == 2
+
+run = 0
+@memoize Dict{__Key__,__Value__}() function auto_dict_call(a::String)::Int
+    global run += 1
+    length(a)
+end
+@test auto_dict_call("a") == 1
+@test run == 1
+@test auto_dict_call("a") == 1
+@test run == 1
+@test auto_dict_call("bb") == 2
 @test run == 2
+@test auto_dict_call("bb") == 2
+@test run == 2
+#@test memories(auto_dict_call)[1] isa Dict{Tuple{String}, Int} TODO
 
 @memoize non_allocating(x) = x+1
 @test @allocated(non_allocating(10)) == 0
