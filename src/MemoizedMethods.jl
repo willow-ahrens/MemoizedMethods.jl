@@ -77,7 +77,6 @@ macro memoize(args...)
     def[:kwargs] = combine.(kwargs)
     @gensym inferrable
     inferrable_def = deepcopy(def)
-    inferrable_def[:name] = inferrable
     inferrable_args = copy(args)
     inferrable_kwargs = copy(kwargs)
     pop!(inferrable_def, :params, nothing)
@@ -99,6 +98,15 @@ macro memoize(args...)
         else # Normal call
             head = :(typeof($(def[:name])))
             name = def[:name]
+            #Named inner function definitions are sometimes evaluated
+            #asynchronously, and only use Symbols as the function name
+            #in both the local and global cases, its safe to name the
+            #inference function after the function name, since they
+            #dispatch identically. Naming them after the same function
+            #name ensures that the symbol is defined when it needs to be.
+            if def[:name] isa Symbol 
+                inferrable = Symbol(def[:name], "__inferrable__")
+            end
         end
         sig = :(Tuple{$head, $(dispatch.(args)...)} where {$(def[:whereparams]...)})
     else # Anonymous function
@@ -106,6 +114,7 @@ macro memoize(args...)
     end
     tail = :(Tuple{$(dispatch.(args)...)} where {$(def[:whereparams]...)})
 
+    inferrable_def[:name] = inferrable
     inferrable_def[:args] = combine.(inferrable_args)
 
     cache = gensym(:__cache__)
