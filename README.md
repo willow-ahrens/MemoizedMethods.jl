@@ -1,17 +1,16 @@
-# Memoize.jl
+# MemoizedMethods.jl
 
-[![Build Status][ci-img]][ci-url]
-[![Coverage Status](https://coveralls.io/repos/github/JuliaCollections/Memoize.jl/badge.svg?branch=master)](https://coveralls.io/github/JuliaCollections/Memoize.jl?branch=master)
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://peterahrens.github.io/MemoizedMethods.jl/stable)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://peterahrens.github.io/MemoizedMethods.jl/dev)
+[![Build Status](https://github.com/peterahrens/MemoizedMethods.jl/workflows/CI/badge.svg)](https://github.com/peterahrens/MemoizedMethods.jl/actions)
+[![Coverage](https://codecov.io/gh/peterahrens/MemoizedMethods.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/peterahrens/MemoizedMethods.jl)
 
-[ci-img]: https://github.com/JuliaCollections/Memoize.jl/workflows/CI/badge.svg
-[ci-url]: https://github.com/JuliaCollections/Memoize.jl/actions
-
-Easy method memoization for Julia.
+Methodwise memoization for Julia, supporting all the corner cases. 
 
 ## Usage
 
 ```julia
-using Memoize
+using MemoizedMethods
 @memoize function x(a)
 	println("Running")
 	2a
@@ -42,7 +41,7 @@ julia> x(1)
 2
 ```
 
-By default, Memoize.jl uses an [`IdDict`](https://docs.julialang.org/en/v1/base/collections/#Base.IdDict) as a cache, but it's also possible to specify the type of the cache. If you want to cache vectors based on the values they contain, you probably want this:
+By default, MemoizedMethods.jl uses an [`IdDict`](https://docs.julialang.org/en/v1/base/collections/#Base.IdDict) as a cache, but it's also possible to specify the type of the cache. If you want to cache vectors based on the values they contain, you probably want this:
 
 ```julia
 using Memoize
@@ -96,3 +95,5 @@ Note that the `@memoize` macro treats the type argument differently depending on
 end
 ```
 the expression `CacheType` must be either a non-function-call that evaluates to a type, or a function call that evaluates to an _instance_ of the desired cache type.  Either way, the methods `Base.get!` and `Base.empty!` must be defined for the supplied cache type.
+
+This package was forked from [Memoize.jl](https://github.com/JuliaCollections/Memoize.jl) to support more corner cases and different syntax.

@@ -1,4 +1,4 @@
-module Memoize
+module MemoizedMethods
 using MacroTools: isexpr, combinedef, namify, splitarg, splitdef
 export @memoize, forget!
 

@@ -1,3 +1,7 @@
+MIT License
+
+Copyright (c) 2021 Peter Ahrens for MemoizedMethods.jl, modified from Memoize.jl.
+
 Copyright (c) 2012-2013: Simon Kornblith, Stefan Karpinski, Kevin Squire, 
 and other contributors:
 

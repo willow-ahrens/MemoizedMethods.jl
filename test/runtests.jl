@@ -1,4 +1,4 @@
-using Memoize, Test, Pkg
+using MemoizedMethods, Test, Pkg
 
 @test_throws LoadError eval(:(@memoize))
 @test_throws LoadError eval(:(@memoize () = ()))
@@ -377,7 +377,7 @@ end
 
 module MemoizeTest
 using Test
-using Memoize
+using MemoizedMethods
 
 const MyDict = Dict
 
