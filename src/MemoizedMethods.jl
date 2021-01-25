@@ -58,11 +58,15 @@ macro memoize(args...)
 
     combine(arg) = combinearg(arg.arg_name, arg.arg_type, arg.slurp, arg.default)
 
-    pass(arg) =
-        (arg.slurp || arg.vararg) ? Expr(:..., arg.arg_name) :
-            arg.iskwarg ? Expr(:kw, arg.arg_name, arg.arg_name) : arg.arg_name
+    pass(arg) = (arg.slurp || arg.vararg) ? Expr(:..., arg.arg_name) :
+        arg.iskwarg ? Expr(:kw, arg.arg_name, arg.arg_name) : arg.arg_name
 
     dispatch(arg) = arg.slurp ? :(Vararg{$(arg.arg_type)}) : arg.arg_type
+
+    key(arg) = arg.trait ? arg.arg_type : arg.arg_name
+
+    key_type(arg) = arg.trait ? DataType :
+        arg.vararg ? :(Tuple{$(arg.arg_type)}) : arg.arg_type
 
     args = split.(def[:args])
     kwargs = split.(def[:kwargs], true)
@@ -101,50 +105,19 @@ macro memoize(args...)
 
     inferrable_def[:args] = combine.(inferrable_args)
 
-    # Set up arguments for memo key
-    key_names = map([inferrable_args; inferrable_kwargs]) do arg
-        arg.trait ? arg.arg_type : arg.arg_name
-    end
-    key_types = map([inferrable_args; inferrable_kwargs]) do arg
-        arg.trait ? DataType :
-        arg.vararg ? :(Tuple{$(arg.arg_type)}) :
-            arg.arg_type
-    end
-
     cache = gensym(:__cache__)
 
-    pass_args = pass.(inferrable_args)
-    pass_kwargs = pass.(inferrable_kwargs)
     def[:body] = quote
-        get!($cache[2], ($(key_names...),)) do
+        get!($cache[2], ($(map(key, [inferrable_args; inferrable_kwargs])...),)) do
             $(def[:body])
         end
     end
 
-    # A return type declaration of Any is a No-op because everything is <: Any
-    return_type = get(def, :rtype, Any)
-
-    #=
-    To improve inference in kwarg cases, might want to look into these functions
-    @which f(1; k=2)
-    return_type = InteractiveUtils.gen_call_with_extracted_types(Main, :(Core.Compiler.return_type), :($inferrable()))
-        #= /Users/Peter/Projects/julia/usr/share/julia/stdlib/v1.5/InteractiveUtils/src/macros.jl:86 =#
-        local arg1 = $(Expr(:escape, :f))
-        #= /Users/Peter/Projects/julia/usr/share/julia/stdlib/v1.5/InteractiveUtils/src/macros.jl:87 =#
-        local (args, kwargs) = (InteractiveUtils.separate_kwargs)($(Expr(:escape, :($(Expr(:parameters, :($(Expr(:kw, :k, 2)))))))), $(Expr(:escape, 1)))
-        #= /Users/Peter/Projects/julia/usr/share/julia/stdlib/v1.5/InteractiveUtils/src/macros.jl:88 =#
-        Core.Complier.return_type(Core.kwfunc(arg1), Tuple{typeof(kwargs), Core.Typeof(arg1), map(Core.Typeof, args)...}; )
-
-    Core.kwfunc(arg1)   
-    :($(Expr(:parameters, :($(Expr(:kw, :k, 2)))))))
-    =#
-
     if length(kwargs) == 0
         def[:body] = quote
-            $(def[:body])::Core.Compiler.widenconst(Core.Compiler.return_type($inferrable, typeof(($(pass_args...),))))
+            $(def[:body])::Core.Compiler.widenconst(Core.Compiler.return_type($inferrable, typeof(($(pass.(inferrable_args)...),))))
         end
     end
-
 
     scope = gensym()
 
@@ -152,8 +125,8 @@ macro memoize(args...)
         # The `local` qualifier will make this performant even in the global scope.
         $(esc(quote
             local $cache = begin
-                local __Key__ = (Tuple{$(key_types...)} where {$(def[:whereparams]...)})
-                local __Value__ = ($return_type where {$(def[:whereparams]...)})
+                local __Key__ = (Tuple{$(map(key_type, [inferrable_args; inferrable_kwargs])...)} where {$(def[:whereparams]...)})
+                local __Value__ = ($(get(def, :rtype, Any)) where {$(def[:whereparams]...)})
                 ($tail, $cache_constructor)
             end
         end))
@@ -219,8 +192,8 @@ end
 """
     forget!(m::Method)
     
-    If m, defined at global scope, is a memoized function, `empty!` its
-    cache.
+    If m, a non-anonymous method defined at global scope, is a memoized
+    method, `empty!` its cache.
 """
 function forget!(m::Method)
     if isdefined(m.module, :__memories__)
