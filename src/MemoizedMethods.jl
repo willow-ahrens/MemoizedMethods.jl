@@ -3,8 +3,8 @@ using MacroTools: isexpr, combinearg, combinedef, namify, splitarg, splitdef, @c
 export @memoize, forget!
 
 # which($sig) becomes available in Julia 1.6, so here's a workaround
-function _which(tt)
-    meth = ccall(:jl_gf_invoke_lookup, Any, (Any, UInt), tt, typemax(UInt))
+function _which(tt, world=typemax(UInt))
+    meth = ccall(:jl_gf_invoke_lookup, Any, (Any, UInt), tt, world)
     if meth !== nothing
         if meth isa Method
             return meth::Method
@@ -14,6 +14,9 @@ function _which(tt)
         end
     end
 end
+
+# get_world_counter was never exported, so here's a workaround
+_get_world_counter() = ccall(:jl_get_world_counter, UInt, ())
 
 """
     @memoize [cache] declaration
@@ -136,16 +139,7 @@ macro memoize(args...)
         $(if @isdefined sig
             quote
                 if isdefined($__module__, $(QuoteNode(scope)))
-                    $(if @isdefined name
-                        esc(:(function $name end))
-                    end)
-
-                    # If overwriting a method, empty the old cache.
-                    # Notice that methods are hashed by their stored signature
-                    local meth = $_which($(esc(sig)))
-                    if meth != nothing && meth.sig == $(esc(sig)) && isdefined(meth.module, :__memories__)
-                        empty!(pop!(meth.module.__memories__, meth.sig, (nothing, []))[2])
-                    end
+                    local world = _get_world_counter()
                 end
             end
         end)
@@ -156,6 +150,13 @@ macro memoize(args...)
         $(if @isdefined sig
             quote
                 if isdefined($__module__, $(QuoteNode(scope)))
+                    # If overwriting a method, empty the old cache.
+                    # Notice that methods are hashed by their stored signature
+                    local meth = $_which($(esc(sig)), world)
+                    if meth != nothing && meth.sig == $(esc(sig)) && isdefined(meth.module, :__memories__)
+                        empty!(pop!(meth.module.__memories__, meth.sig, (nothing, []))[2])
+                    end
+
                     if !isdefined($__module__, :__memories__)
                         $(esc(:__memories__)) = IdDict()
                     end

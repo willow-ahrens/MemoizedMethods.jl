@@ -274,11 +274,11 @@ end
 outer()
 @test !@isdefined inner
 
-function outer_overwrite(y)
+function outer_multi(y)
     run = 0
     @memoize function inner(x)
         run += 1
-        (x, y, run)
+        (x + 1, y, run)
     end
     #note that calling inner here would result in an error,
     #since both definitions of inner are evaluated before the
@@ -286,13 +286,13 @@ function outer_overwrite(y)
     #of inner has not been set up yet.
     @memoize function inner(x)
         run += 1
-        (x + 1, y, run)
+        (x, y, run)
     end
-    @test inner(5) == (6, y, 1)
+    @test inner(5) == (5, y, 1)
     @test run == 1
-    @test inner(5) == (6, y, 1)
+    @test inner(5) == (5, y, 1)
     @test run == 1
-    @test inner(6) == (7, y, 2)
+    @test inner(6) == (6, y, 2)
     @test run == 2
     @memoize function inner(x::String)
         run += 1
@@ -301,20 +301,20 @@ function outer_overwrite(y)
     return inner
 end
 
-inner_1 = outer_overwrite(7)
-inner_2 = outer_overwrite(42)
-@test inner_1(5) == (6, 7, 1)
-@test inner_1(6) == (7, 7, 2)
-@test inner_1(7) == (8, 7, 3)
+inner_1 = outer_multi(7)
+inner_2 = outer_multi(42)
+@test inner_1(5) == (5, 7, 1)
+@test inner_1(6) == (6, 7, 2)
+@test inner_1(7) == (7, 7, 3)
 @test inner_1("hello") == ("hello", 7, 4)
-@test inner_2(7) == (8, 42, 3)
-@test inner_2(5) == (6, 42, 1)
-@test inner_2(6) == (7, 42, 2)
+@test inner_2(7) == (7, 42, 3)
+@test inner_2(5) == (5, 42, 1)
+@test inner_2(6) == (6, 42, 2)
 @test inner_2("goodbye") == ("goodbye", 42, 4)
 @test inner_2("hello") == ("hello", 42, 5)
 forget!(inner_1, Tuple{Any})
-@test inner_1(5) == (6, 7, 5)
-@test inner_2(6) == (7, 42, 2)
+@test inner_1(5) == (5, 7, 5)
+@test inner_2(6) == (6, 42, 2)
 @test inner_1("hello") == ("hello", 7, 4)
 
 trait_function(a, ::Bool) = (-a,)
