@@ -100,7 +100,7 @@ macro memoize(args...)
 
         if isdefined($__module__, $(QuoteNode(scope)))
             if !@isdefined __memories__
-                __memories__ = Dict()
+                __memories__ = IdDict()
             end
             # Store the cache so that it can be emptied later
             local $meth = $which($f, $tail)
