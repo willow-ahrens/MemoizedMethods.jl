@@ -535,21 +535,22 @@ map(forget!, methods(MemoizeTest.custom_dict))
 @test custom_dict(1) == 1
 @test MemoizeTest.run == 4
 
+if VERSION >= v"1.5.0"
+    Pkg.activate(temp=true)
+    Pkg.develop(path=joinpath(@__DIR__, "TestPrecompile"))
+    using TestPrecompile
 
-Pkg.activate(temp=true)
-Pkg.develop(path=joinpath(@__DIR__, "TestPrecompile"))
-using TestPrecompile
+    @test TestPrecompile.run == 1
+    @test TestPrecompile.forgetful(1)
+    @test TestPrecompile.run == 1
 
-@test TestPrecompile.run == 1
-@test TestPrecompile.forgetful(1)
-@test TestPrecompile.run == 1
+    Pkg.develop(path=joinpath(@__DIR__, "TestPrecompile2"))
+    using TestPrecompile2
 
-Pkg.develop(path=joinpath(@__DIR__, "TestPrecompile2"))
-using TestPrecompile2
-
-@test TestPrecompile.run == 1
-@test TestPrecompile.forgetful(2)
-@test TestPrecompile.run == 2
+    @test TestPrecompile.run == 1
+    @test TestPrecompile.forgetful(2)
+    @test TestPrecompile.run == 2
+end
 
 run = 0
 @memoize Dict{Tuple{String},Int}() function dict_call(a::String)::Int
@@ -580,4 +581,5 @@ end
 #@test memories(auto_dict_call)[1] isa Dict{Tuple{String}, Int} TODO
 
 @memoize non_allocating(x) = x+1
+non_allocating(10)
 @test @allocated(non_allocating(10)) == 0
