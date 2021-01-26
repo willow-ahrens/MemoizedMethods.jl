@@ -535,6 +535,7 @@ map(forget!, methods(MemoizeTest.custom_dict))
 @test custom_dict(1) == 1
 @test MemoizeTest.run == 4
 
+
 Pkg.activate(temp=true)
 Pkg.develop(path=joinpath(@__DIR__, "TestPrecompile"))
 using TestPrecompile

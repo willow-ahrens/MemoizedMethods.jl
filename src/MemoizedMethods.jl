@@ -107,7 +107,7 @@ macro memoize(args...)
             #dispatch identically. Naming them after the same function
             #name ensures that the symbol is defined when it needs to be.
             if def[:name] isa Symbol 
-                inferrable = Symbol(def[:name], :__inferrable__)
+                inferrable = Symbol(def[:name], :_inferrable, salt)
             end
         end
         sig = :(Tuple{$head, $(dispatch.(args)...)} where {$(def[:whereparams]...)})
@@ -119,7 +119,8 @@ macro memoize(args...)
     inferrable_def[:name] = inferrable
     inferrable_def[:args] = combine.(inferrable_args)
 
-    cache = gensym(:__cache__)
+    cache = gensym(Symbol(:cache, salt))
+    bank = Symbol(:bank, salt)
 
     def[:body] = quote
         get!($cache[2], ($(map(key, [inferrable_args; inferrable_kwargs])...),)) do
@@ -164,16 +165,16 @@ macro memoize(args...)
                     # If overwriting a method, empty the old cache.
                     # Notice that methods are hashed by their stored signature
                     local meth = $_which($(esc(sig)), world)
-                    if meth != nothing && meth.sig == $(esc(sig)) && isdefined(meth.module, :__memories__)
-                        empty!(pop!(meth.module.__memories__, meth.sig, (nothing, []))[2])
+                    if meth != nothing && meth.sig == $(esc(sig)) && isdefined(meth.module, $(Expr(:quote, bank)))
+                        empty!(pop!(meth.module.$bank, meth.sig, (nothing, []))[2])
                     end
 
-                    if !isdefined($__module__, :__memories__)
-                        $(esc(:__memories__)) = IdDict()
+                    if !isdefined($__module__, $(Expr(:quote, bank)))
+                        $(esc(bank)) = IdDict()
                     end
                     # Store the cache so that it can be emptied later
                     local meth = $_which($(esc(sig)))
-                    $(esc(:__memories__))[meth.sig] = $(esc(cache))
+                    $(esc(bank))[meth.sig] = $(esc(cache))
                 end
             end
         end)
@@ -183,14 +184,14 @@ macro memoize(args...)
 end
 
 """
-    forget!(f, types)
+    forget!(f, types::Type)
     
     If the method `which(f, types)`, is memoized, `empty!` its cache in the
     scope of `f`.
 """
 function forget!(f, types)
     for name in propertynames(f) #if f is a closure, we walk its fields
-        if first(string(name), length("##__cache__")) == "##__cache__"
+        if first(string(name), length(string("##cache", salt))) == string("##cache", salt)
             cache = getproperty(f, name)
             if cache isa Core.Box
                 cache = cache.contents
@@ -208,8 +209,8 @@ end
     method, `empty!` its cache.
 """
 function forget!(m::Method)
-    if isdefined(m.module, :__memories__)
-        empty!(get(m.module.__memories__, m.sig, (nothing, []))[2])
+    if isdefined(m.module, Symbol(:bank, salt))
+        empty!(get(getproperty(m.module, Symbol(:bank, salt)), m.sig, (nothing, []))[2])
     end
 end
 
