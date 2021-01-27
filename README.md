@@ -5,118 +5,107 @@
 [![Build Status](https://github.com/peterahrens/MemoizedMethods.jl/workflows/CI/badge.svg)](https://github.com/peterahrens/MemoizedMethods.jl/actions)
 [![Coverage](https://codecov.io/gh/peterahrens/MemoizedMethods.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/peterahrens/MemoizedMethods.jl)
 
-Correct, concise, method memoization for Julia.
+Methodwise memoization for Julia. Use any function definition syntax at any scope! Specialize custom dictionary types with straightforward syntax! Don't compute the same thing twice!
 
 ## Usage
 
 ```julia
 using MemoizedMethods
-@memoize function x(a)
-	println("Running")
-	2a
+@memoize function f(x, y) where {X}
+	println("run")
+	x + y
 end
 ```
 
-```
-julia> x(1)
-Running
+```julia-repl
+julia> f(1, 1)
+run
 2
 
-julia> memories(x)
-1-element Array{Any,1}:
- IdDict{Any,Any}((1,) => 2)
+julia> f(1, 2)
+run
+3
 
-julia> x(1)
-2
-
-julia> map(empty!, memories(x))
-1-element Array{IdDict{Tuple{Any},Any},1}:
- IdDict()
-
-julia> x(1)
-Running
-2
-
-julia> x(1)
+julia> f(1, 1)
 2
 ```
 
-By default, MemoizedMethods.jl uses an [`IdDict`](https://docs.julialang.org/en/v1/base/collections/#Base.IdDict) as a cache, but it's also possible to specify your own cache that supports the methods `Base.get!` and `Base.empty!`. If you want to cache vectors based on the values they contain, you probably want this:
+By default, MemoizedMethods.jl uses an [`IdDict`](https://docs.julialang.org/en/v1/base/collections/#Base.IdDict) as a cache, but you can specify an expression that evaluates to a cache of your very own, so long as it supports the methods `Base.get!` and `Base.empty!`. If you want to cache vectors based on the values they contain, you probably want this:
 
 ```julia
 using Memoize
 @memoize Dict() function x(a)
-	println("Running")
+	println("run")
 	a
 end
 ```
 
-You can also specify the full expression for constructing the cache. The variables `__Key__` and `__Value__` are available to the constructor expression, containing the syntactically determined type bounds on the keys and values used by Memoize.jl.  For example, to use LRUCache.jl:
+The variables `__Key__` and `__Value__` are available to the constructor expression, containing syntactically determined type bounds on the keys and values used by MemoizedMethods.jl. Here's an example using [LRUCache.jl](https://github.com/JuliaCollections/LRUCache.jl):
 
 ```julia
 using Memoize
 using LRUCache
 @memoize LRU{__Key__,__Value__}(maxsize=2) function x(a, b)
-    println("Running")
+    println("run")
     a + b
 end
 ```
 
-```julia
+```julia-repl
 julia> x(1,2)
-Running
+run
 3
 
 julia> x(1,2)
 3
 
 julia> x(2,2)
-Running
+run
 4
 
 julia> x(2,3)
-Running
+run
 5
 
 julia> x(1,2)
-Running
+run
 3
 
 julia> x(2,3)
 5
 ```
 
-Memoize works on *almost* every method declaration in global and local scope, including lambdas and callable objects. When only the type of an argument is given, memoize caches the type.
+MemoizedMethods works on *almost* every function declaration in global and local scope, including lambdas and callable objects. Each method and scope is memoized with a separate cache. When an argument is unnamed, MemoizedMethods only uses the type of the argument as a key to the cache. Callable types and callable objects are keyed as an extra first argument.
 
-julia```
+```julia
 struct F{A}
 	a::A
 end
-@memoize function (::F{A})(b, ::C) where {A, C}
-	println("Running")
-	(A, b, C)
+@memoize function (f::F{A})(b, ::C) where {A, C}
+	println("run")
+	(f.a + b, C)
 end
 ```
-the expression `CacheType` must be either a non-function-call that evaluates to a type, or a function call that evaluates to an _instance_ of the desired cache type.  Either way, the methods `Base.get!` and `Base.empty!` must be defined for the supplied cache type.
 
-This package was forked from [Memoize.jl](https://github.com/JuliaCollections/Memoize.jl) to support more corner cases and different syntax.
+```julia-repl
+julia> F(1)(1, "hello")
+run
+(2, String)
 
+julia> F(1)(1, "goodbye")
+(2, String)
+
+julia> F(1)(2, "goodbye")
+run
+(3, String)
+
+julia> F(1)(2, false)
+run
+(3, Bool)
+
+julia> F(2)(2, false)
+run
+(4, Bool)
 ```
-julia> F(1)(1, 1)
-Running
-(Int64, 1, Int64)
 
-julia> F(1)(1, 2)
-(Int64, 1, Int64)
-
-julia> F(1)(2, 2)
-Running
-(Int64, 2, Int64)
-
-julia> F(2)(2, 2)
-(Int64, 2, Int64)
-
-julia> F(false)(2, 2)
-Running
-(Bool, 2, Int64)
-```
+This package was forked from [Memoize.jl](https://github.com/JuliaCollections/Memoize.jl) to support extra corner cases and features. Thanks to all of the Memoize.jl contributors.
