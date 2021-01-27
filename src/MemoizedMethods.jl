@@ -31,7 +31,7 @@ _get_world_counter() = ccall(:jl_get_world_counter, UInt, ())
 """
 macro memoize(args...)
     if length(args) == 1
-        cache_constructor = :(IdDict{__Key__}{__Value__}())
+        cache_constructor = :(IdDict())
         ex = args[1]
     elseif length(args) == 2
         (cache_constructor, ex) = args
@@ -125,6 +125,7 @@ macro memoize(args...)
     def[:body] = quote
         get!($cache[2], ($(map(key, [inferrable_args; inferrable_kwargs])...),)) do
             $(def[:body])
+            #$inferrable($(pass.(inferrable_args)...); $(pass.(inferrable_kwargs)...))
         end
     end
 
