@@ -11,7 +11,7 @@ Methodwise memoization for Julia. Use any function definition syntax at any scop
 
 ```julia
 using MemoizedMethods
-@memoize function f(x, y) where {X}
+@memoize function f(x, y)
 	println("run")
 	x + y
 end
@@ -75,7 +75,29 @@ julia> x(2,3)
 5
 ```
 
-MemoizedMethods works on *almost* every function declaration in global and local scope, including lambdas and callable objects. Each method and scope is memoized with a separate cache. When an argument is unnamed, MemoizedMethods only uses the type of the argument as a key to the cache. Callable types and callable objects are keyed as an extra first argument.
+You can look up caches with the function `memories`, and clear caches with the function `forget!`, both of which take the same arguments as the
+function `Base.which`. You can also directly specify a `Base.Method` or `Base.MethodList` (returned from e.g. `Base.methods`).
+
+```julia-repl
+julia> memories(methods(x))
+#TODO
+
+julia> memories(x, Tuple{Int, Int})
+#TODO
+
+julia> x(2,3)
+5
+
+julia> forget!(x, Tuple{Int, Int})
+
+julia> x(2,3)
+run
+5
+```
+
+## Details
+
+MemoizedMethods works on *almost* every function declaration in global and local scope, including lambdas and callable objects. Each method and scope is memoized with a separate cache. When an argument is unnamed, MemoizedMethods uses only the type of the argument as a key to the cache. Callable types and callable objects are keyed as an extra first argument.
 
 ```julia
 struct F{A}
@@ -107,5 +129,65 @@ julia> F(2)(2, false)
 run
 (4, Bool)
 ```
+
+Each scope of an inner function gets its own cache. MemoizedMethods avoids tracking inner caches so that that they can be garbage collected. Thus, you can't reference inner caches with `Method` objects. To clear the cache of a closure, you must pass an instance of the closure itself to `forget!`.
+
+```julia
+function h(x)
+	@memoize function f(y)
+		println("run")
+		x + y
+	end
+end
+f1 = h(1)
+f2 = h(2)
+```
+
+```julia-repl
+julia> f1(3)
+run
+4
+
+julia> f1(3)
+4
+
+julia> f2(3)
+run
+5
+
+julia> f2(3)
+5
+
+julia> forget!(f1)
+
+julia> f1(3)
+run
+4
+
+julia> f2(3)
+5
+```
+
+MemoizedMethods expands to a function that closes over a variable holding the cache. The cache is also referenced in a global structure for later lookups. If a method is overwritten at global scope, MemoizedMethods automatically calls `empty!` on the old cache. Roughly, our starter example
+
+```julia
+@memoize function f(x, y)
+	println("run")
+	x + y
+end
+```
+expands to something like
+```julia
+using MemoizedMethods
+local cache = IdDict()
+function f(x, y)
+	get!(cache, (x, y)) do
+		println("run")
+		x + y
+	end
+end
+```
+
+## Thanks
 
 This package was forked from [Memoize.jl](https://github.com/JuliaCollections/Memoize.jl) to support extra corner cases and features. Thanks to all of the Memoize.jl contributors.

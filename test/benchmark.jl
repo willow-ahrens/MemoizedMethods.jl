@@ -10,11 +10,11 @@ MemoizedMethods.@memoize fib_MemoizedMethods(n::Int) = n <= 1 ? 1 : fib_Memoized
 
 N = 10000
 
-println("fib_MemoizedMethods($N):")
-@btime fib_MemoizedMethods($N) setup = map(forget!, methods(fib_MemoizedMethods))
-
 println("fib_Memoize($N):")
 @btime fib_Memoize($N) setup = empty!(Memoize.memoize_cache(fib_Memoize))
 
 println("fib_Memoization($N):")
 @btime fib_Memoization($N) setup = Memoization.empty_cache!(fib_Memoization)
+
+println("fib_MemoizedMethods($N):")
+@btime fib_MemoizedMethods($N) setup = map(forget!, methods(fib_MemoizedMethods))
