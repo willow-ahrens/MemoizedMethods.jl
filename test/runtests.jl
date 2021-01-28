@@ -313,7 +313,7 @@ inner_2 = outer_multi(42)
 @test inner_2("goodbye") == ("goodbye", 42, 4)
 @test inner_2("hello") == ("hello", 42, 5)
 forget!(inner_1, Tuple{Any})
-@test inner_1(5) == (5, 7, 5)
+@test inner_1(5) == (5, 7, 1)
 @test inner_2(6) == (6, 42, 2)
 @test inner_1("hello") == ("hello", 7, 4)
 
@@ -578,7 +578,9 @@ end
 @test run == 2
 @test auto_dict_call("bb") == 2
 @test run == 2
-#@test memories(auto_dict_call)[1] isa Dict{Tuple{String}, Int} TODO
+@test memories(auto_dict_call, Tuple{String}) isa Dict{Tuple{String}, Int}
+forget!(auto_dict_call, Tuple{String})
+@test length(memories(auto_dict_call, Tuple{String})) == 0
 
 @memoize non_allocating(x) = x+1
 non_allocating(10)

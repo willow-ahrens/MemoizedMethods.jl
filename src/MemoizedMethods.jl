@@ -1,6 +1,6 @@
 module MemoizedMethods
 using MacroTools: isexpr, combinearg, combinedef, namify, splitarg, splitdef, @capture
-export @memoize, forget!
+export @memoize, memories, forget!
 
 const salt = :__UYTBOOUDVEWICBEWNMDO__ #Symbol(:__, join(rand('A':'Z', 20)), :__)
 
@@ -186,7 +186,8 @@ end
     scope of `f`. Otherwise, return `nothing` or an overwritten cache.
 """
 function memories(f, types)
-    types = Tuple{which(f, types).sig.parameters[2:end]...}
+    m = which(f, types)
+    types = Tuple{m.sig.parameters[2:end]...}
     for name in propertynames(f) #if f is a closure, we walk its fields
         if first(string(name), length(string("##cache", salt))) == string("##cache", salt)
             cache = getproperty(f, name)
@@ -234,7 +235,7 @@ end
         
     If the method `m`, is memoized, `empty!` its cache.
 """
-function forget!(m::Method) end
+function forget!(m::Method)
     c = memories(m)
     if c !== nothing
         return empty!(c)

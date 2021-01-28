@@ -33,64 +33,64 @@ julia> f(1, 1)
 By default, MemoizedMethods.jl uses an [`IdDict`](https://docs.julialang.org/en/v1/base/collections/#Base.IdDict) as a cache, but you can specify an expression that evaluates to a cache of your very own, so long as it supports the methods `Base.get!` and `Base.empty!`. If you want to cache vectors based on the values they contain, you probably want this:
 
 ```julia
-using Memoize
-@memoize Dict() function x(a)
+@memoize Dict() function g(x)
 	println("run")
-	a
+	x
 end
 ```
 
 The variables `__Key__` and `__Value__` are available to the constructor expression, containing syntactically determined type bounds on the keys and values used by MemoizedMethods.jl. Here's an example using [LRUCache.jl](https://github.com/JuliaCollections/LRUCache.jl):
 
 ```julia
-using Memoize
 using LRUCache
-@memoize LRU{__Key__,__Value__}(maxsize=2) function x(a, b)
+@memoize LRU{__Key__,__Value__}(maxsize=2) function g(x, y)
     println("run")
-    a + b
+    x + y
 end
 ```
 
 ```julia-repl
-julia> x(1,2)
+julia> g(1,2)
 run
 3
 
-julia> x(1,2)
+julia> g(1,2)
 3
 
-julia> x(2,2)
+julia> g(2,2)
 run
 4
 
-julia> x(2,3)
+julia> g(2,3)
 run
 5
 
-julia> x(1,2)
+julia> g(1,2)
 run
 3
 
-julia> x(2,3)
+julia> g(2,3)
 5
 ```
 
 You can look up caches with the function `memories`, and clear caches with the function `forget!`, both of which take the same arguments as the
-function `Base.which`. You can also directly specify a `Base.Method` or `Base.MethodList` (returned from e.g. `Base.methods`).
+function `Base.which`. You can also directly specify a `Base.Method`.
 
 ```julia-repl
-julia> memories(methods(x))
-#TODO
+julia> memories(g, Tuple{Any})
+Dict{Any,Any}()
 
-julia> memories(x, Tuple{Int, Int})
-#TODO
+julia> memories(g, Tuple{Any, Any})
+LRU{Tuple{Any,Any},Any} with 2 entries:
+  (2, 3) => 5
+  (1, 2) => 3
 
-julia> x(2,3)
+julia> g(2,3)
 5
 
-julia> forget!(x, Tuple{Int, Int})
+julia> map(forget!, methods(g))
 
-julia> x(2,3)
+julia> g(2,3)
 run
 5
 ```
@@ -180,10 +180,13 @@ expands to something like
 ```julia
 using MemoizedMethods
 local cache = IdDict()
+function _f(x, y)
+	println("run")
+	x + y
+end
 function f(x, y)
 	get!(cache, (x, y)) do
-		println("run")
-		x + y
+		_f(x, y)
 	end
 end
 ```
