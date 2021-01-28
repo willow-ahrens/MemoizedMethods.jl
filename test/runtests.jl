@@ -417,6 +417,23 @@ end
 @test callable_type{Bool}(3) == (Bool, 3)
 @test run == 3
 
+run = 0
+struct Constructable
+    x
+    @memoize function Constructable(a)
+        global run += 1
+        new(a)
+    end
+end
+@test Constructable(5).x == 5
+@test run == 1
+@test Constructable(5).x == 5
+@test run == 1
+@test Constructable(6).x == 6
+@test run == 2
+@test Constructable(6).x == 6
+@test run == 2
+
 genrun = 0
 @memoize function genspec(a)
     global genrun += 1

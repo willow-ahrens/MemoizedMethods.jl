@@ -23,11 +23,11 @@ _get_world_counter() = ccall(:jl_get_world_counter, UInt, ())
 """
     @memoize [cache] declaration
     
-    Transform any method declaration `declaration` (except for inner constructors) so that calls to the original method are cached by their arguments. When an argument is unnamed, its type is treated as an argument instead.
+    Transform any method declaration `declaration` so that calls to the original method are cached by their arguments. When an argument is unnamed, its type is treated as the argument instead. If the function is defined in local scope, each closure will have a separate cache.
     
     `cache` should be an expression which evaluates to a dictionary-like type that supports `get!` and `empty!`, and may depend on the local variables `__Key__` and `__Value__`, which evaluate to syntactically-determined bounds on the required key and value types the cache must support.
 
-    If the given cache contains values, it is assumed that they will agree with the values the method returns. Specializing a method will not empty the cache, but overwriting a method will. The caches corresponding to methods can be determined with `memory` or `memories.`
+    If the given cache contains values, it is assumed that they will agree with the values the method returns. Specializing a method will not empty the cache, but overwriting a method will. You can look up or empty the cache with the functions `memories` and `forget!`.
 """
 macro memoize(args...)
     if length(args) == 1

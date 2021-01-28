@@ -97,7 +97,7 @@ run
 
 ## Details
 
-MemoizedMethods works on *almost* every function declaration in global and local scope, including lambdas and callable objects. Each method and scope is memoized with a separate cache. When an argument is unnamed, MemoizedMethods uses only the type of the argument as a key to the cache. Callable types and callable objects are keyed as an extra first argument.
+MemoizedMethods works on every function declaration in global and local scope, including lambdas, callable types and objects, and inner constructors. Each method and scope is memoized with a separate cache. When an argument is unnamed, MemoizedMethods uses only the type of the argument as a key to the cache. Callable types and callable objects are keyed as an extra first argument.
 
 ```julia
 struct F{A}
