@@ -158,7 +158,7 @@ run
 julia> f2(3)
 5
 
-julia> forget!(f1)
+julia> forget!(f1, Tuple{Any})
 
 julia> f1(3)
 run
