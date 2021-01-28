@@ -30,7 +30,7 @@ julia> f(1, 1)
 2
 ```
 
-By default, MemoizedMethods.jl uses an [`IdDict`](https://docs.julialang.org/en/v1/base/collections/#Base.IdDict) as a cache, but you can specify an expression that evaluates to a cache of your very own, so long as it supports the methods `Base.get!` and `Base.empty!`. If you want to cache vectors based on the values they contain, you probably want this:
+By default, MemoizedMethods.jl uses an [`IdDict`](https://docs.julialang.org/en/v1/base/collections/#Base.IdDict) as a cache, but you can specify an expression that evaluates to a cache of your very own, so long as it supports the methods `Base.get!` and `Base.empty!`. If you want arguments to be treated as equivalent when they are `==`, you might use a `Dict` instead (it's quite tricky to guarantee the result is constant over args that are `==`, note that `true == 1 == 1.0`).
 
 ```julia
 @memoize Dict() function g(x)
