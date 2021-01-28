@@ -178,7 +178,6 @@ end
 ```
 expands to something like
 ```julia
-using MemoizedMethods
 local cache = IdDict()
 function _f(x, y)
 	println("run")

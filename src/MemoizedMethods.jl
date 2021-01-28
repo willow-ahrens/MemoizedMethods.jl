@@ -104,7 +104,7 @@ macro memoize(args...)
             sig = :(Tuple{$head, $(dispatch.(args)...)} where {$(def[:whereparams]...)})
         else # Normal syntax style.
             name = def[:name]
-            #Named inner function definitions are sometimes evaluated
+            #Named local function definitions are sometimes evaluated
             #asynchronously, and only use Symbols as the function name
             #in both the local and global cases, its safe to name the
             #inference function after the function name, since they
@@ -127,12 +127,12 @@ macro memoize(args...)
     cache = gensym(Symbol(:cache, salt))
     bank = Symbol(:bank, salt)
 
-    @gensym inner
+    @gensym getter
     def[:body] = quote
         begin
-            $inner = () -> $inferrable($(pass.(inferrable_args)...); $(pass.(inferrable_kwargs)...))
-            $(get!)($inner, $cache[2], ($(map(key, [inferrable_args; inferrable_kwargs])...),))
-        end::$(Core.Compiler.widenconst)($(Core.Compiler.return_type)($inner, $(Tuple{})))
+            $getter = () -> $inferrable($(pass.(inferrable_args)...); $(pass.(inferrable_kwargs)...))
+            $(get!)($getter, $cache[2], ($(map(key, [inferrable_args; inferrable_kwargs])...),))
+        end::$(Core.Compiler.widenconst)($(Core.Compiler.return_type)($getter, $(Tuple{})))
     end
 
     scope = gensym()
