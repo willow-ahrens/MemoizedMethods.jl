@@ -126,8 +126,8 @@ macro memoize(args...)
     def[:body] = quote
         begin
             $inner = () -> $inferrable($(pass.(inferrable_args)...); $(pass.(inferrable_kwargs)...))
-            get!($inner, $cache[2], ($(map(key, [inferrable_args; inferrable_kwargs])...),))
-        end::Core.Compiler.widenconst(Core.Compiler.return_type($inner, Tuple{}))
+            $(get!)($inner, $cache[2], ($(map(key, [inferrable_args; inferrable_kwargs])...),))
+        end::$(Core.Compiler.widenconst)($(Core.Compiler.return_type)($inner, $(Tuple{})))
     end
 
     scope = gensym()
@@ -180,33 +180,66 @@ macro memoize(args...)
 end
 
 """
-    forget!(f, types::Type)
+    memories(f, types::Type)
     
-    If the method `which(f, types)`, is memoized, `empty!` its cache in the
-    scope of `f`.
+    If the method `which(f, types)`, is memoized, return the cache in the
+    scope of `f`. Otherwise, return `nothing` or an overwritten cache.
 """
-function forget!(f, types)
+function memories(f, types)
+    types = Tuple{which(f, types).sig.parameters[2:end]...}
     for name in propertynames(f) #if f is a closure, we walk its fields
         if first(string(name), length(string("##cache", salt))) == string("##cache", salt)
             cache = getproperty(f, name)
             if cache isa Core.Box
                 cache = cache.contents
             end
-            (cache[1] == types) && empty!(cache[2])
+            if (cache[1] == types) 
+                return cache[2]
+            end
         end
     end
-    forget!(which(f, types)) #otherwise, a method would suffice
+    return memories(m) #otherwise, a method would suffice
+end
+
+"""
+    memories(m::Method)
+    
+    If m is a memoized method defined at global scope, return its cache.
+    Otherwise, return `nothing` or an overwritten cache.
+"""
+function memories(m::Method)
+    if isdefined(m.module, Symbol(:bank, salt))
+        return get(getproperty(m.module, Symbol(:bank, salt)), m.sig, (nothing, nothing))[2]
+    end
+    return nothing
+end
+
+"""
+    forget!(f, types::Type)
+        
+    If the method `which(f, types)`, is memoized, `empty!` the cache in the
+    scope of `f`.
+"""
+function forget!(f, types::Type)
+    c = memories(f, types)
+    if c !== nothing
+        return empty!(c)
+    else
+        return nothing
+    end
 end
 
 """
     forget!(m::Method)
-    
-    If m, a non-anonymous method defined at global scope, is a memoized
-    method, `empty!` its cache.
+        
+    If the method `m`, is memoized, `empty!` its cache.
 """
-function forget!(m::Method)
-    if isdefined(m.module, Symbol(:bank, salt))
-        empty!(get(getproperty(m.module, Symbol(:bank, salt)), m.sig, (nothing, []))[2])
+function forget!(m::Method) end
+    c = memories(m)
+    if c !== nothing
+        return empty!(c)
+    else
+        return nothing
     end
 end
 
