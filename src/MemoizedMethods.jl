@@ -122,17 +122,12 @@ macro memoize(args...)
     cache = gensym(Symbol(:cache, salt))
     bank = Symbol(:bank, salt)
 
+    @gensym inner
     def[:body] = quote
-        get!($cache[2], ($(map(key, [inferrable_args; inferrable_kwargs])...),)) do
-            $(def[:body])
-            #$inferrable($(pass.(inferrable_args)...); $(pass.(inferrable_kwargs)...))
-        end
-    end
-
-    if length(kwargs) == 0
-        def[:body] = quote
-            $(def[:body])::Core.Compiler.widenconst(Core.Compiler.return_type($inferrable, typeof(($(pass.(inferrable_args)...),))))
-        end
+        begin
+            $inner = () -> $inferrable($(pass.(inferrable_args)...); $(pass.(inferrable_kwargs)...))
+            get!($inner, $cache[2], ($(map(key, [inferrable_args; inferrable_kwargs])...),))
+        end::Core.Compiler.widenconst(Core.Compiler.return_type($inner, Tuple{}))
     end
 
     scope = gensym()
