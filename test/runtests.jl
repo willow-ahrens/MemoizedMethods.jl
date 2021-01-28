@@ -433,6 +433,7 @@ end
 @test run == 2
 @test Constructable(6).x == 6
 @test run == 2
+@test memories(Constructable, Tuple{Any}) isa IdDict
 
 genrun = 0
 @memoize function genspec(a)

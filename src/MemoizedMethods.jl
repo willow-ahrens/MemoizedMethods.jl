@@ -20,6 +20,9 @@ end
 # get_world_counter was never exported, so here's a workaround
 _get_world_counter() = ccall(:jl_get_world_counter, UInt, ())
 
+# hasproperty becomes available in Julia 1.2
+_hasproperty(x, s) = s in propertynames(x)
+
 """
     @memoize [cache] declaration
     
@@ -93,12 +96,13 @@ macro memoize(args...)
             inferrable_args = [split(:(::Type{$typ})), inferrable_args...]
             def[:name] = combine(inferrable_args[1])
             head = :(Type{$typ})
+            sig = :(Tuple{$head, $(dispatch.(args)...)} where {$(def[:whereparams]...)})
         elseif @capture(def[:name], obj_::obj_type_ | ::obj_type_) # Callable object
             inferrable_args = [split(def[:name]), inferrable_args...]
             def[:name] = combine(inferrable_args[1])
             head = obj_type
-        else # Normal call
-            head = :(typeof($(def[:name])))
+            sig = :(Tuple{$head, $(dispatch.(args)...)} where {$(def[:whereparams]...)})
+        else # Normal syntax style.
             name = def[:name]
             #Named inner function definitions are sometimes evaluated
             #asynchronously, and only use Symbols as the function name
@@ -109,8 +113,9 @@ macro memoize(args...)
             if def[:name] isa Symbol 
                 inferrable = Symbol(def[:name], :_inferrable, salt)
             end
+
+            sig = :(Base.signature_type($(def[:name]), (Tuple{$(dispatch.(args)...)} where {$(def[:whereparams]...)})))
         end
-        sig = :(Tuple{$head, $(dispatch.(args)...)} where {$(def[:whereparams]...)})
     else # Anonymous function
         head = :(typeof($result))
     end
@@ -142,13 +147,9 @@ macro memoize(args...)
             end
         end))
 
-        $(esc(scope)) = nothing
-
         $(if @isdefined sig
             quote
-                if isdefined($__module__, $(QuoteNode(scope)))
-                    local world = _get_world_counter()
-                end
+                local world = _get_world_counter()
             end
         end)
 
@@ -157,19 +158,20 @@ macro memoize(args...)
 
         $(if @isdefined sig
             quote
-                if isdefined($__module__, $(QuoteNode(scope)))
+                if !_hasproperty($(esc(result)), $(Expr(:quote, cache))) 
+                    local sig = $(esc(sig))
                     # If overwriting a method, empty the old cache.
                     # Notice that methods are hashed by their stored signature
-                    local meth = $_which($(esc(sig)), world)
-                    if meth != nothing && meth.sig == $(esc(sig)) && isdefined(meth.module, $(Expr(:quote, bank)))
+                    local meth = _which(sig, world)
+                    if meth != nothing && meth.sig == sig && isdefined(meth.module, $(Expr(:quote, bank)))
                         empty!(pop!(meth.module.$bank, meth.sig, (nothing, []))[2])
                     end
 
                     if !isdefined($__module__, $(Expr(:quote, bank)))
-                        $(esc(bank)) = IdDict()
+                        global $(esc(bank)) = IdDict()
                     end
                     # Store the cache so that it can be emptied later
-                    local meth = $_which($(esc(sig)))
+                    local meth = _which(sig)
                     $(esc(bank))[meth.sig] = $(esc(cache))
                 end
             end
