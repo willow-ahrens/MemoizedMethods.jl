@@ -19,7 +19,7 @@ using MemoizedMethods
 end
 ```
 
-```julia-repl
+```julia
 julia> f(1, 1)
 run
 2
@@ -51,7 +51,7 @@ using LRUCache
 end
 ```
 
-```julia-repl
+```julia
 julia> g(1,2)
 run
 3
@@ -78,7 +78,7 @@ julia> g(2,3)
 You can look up caches with the function `memories`, and clear caches with the function `forget!`, both of which take the same arguments as the
 function `Base.which`. You can also directly specify a `Base.Method`.
 
-```julia-repl
+```julia
 julia> memories(g, Tuple{Any})
 Dict{Any,Any}()
 
@@ -111,7 +111,7 @@ end
 end
 ```
 
-```julia-repl
+```julia
 julia> F(1)(1, "hello")
 run
 (2, String)
@@ -145,7 +145,7 @@ f1 = h(1)
 f2 = h(2)
 ```
 
-```julia-repl
+```julia
 julia> f1(3)
 run
 4
