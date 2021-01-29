@@ -26,11 +26,13 @@ _hasproperty(x, s) = s in propertynames(x)
 """
     @memoize [cache] declaration
     
-    Transform any method declaration `declaration` so that calls to the original method are cached by their arguments. When an argument is unnamed, its type is treated as the argument instead. If the function is defined in local scope, each closure will have a separate cache.
-    
-    `cache` should be an expression which evaluates to a dictionary-like type that supports `get!` and `empty!`, and may depend on the local variables `__Key__` and `__Value__`, which evaluate to syntactically-determined bounds on the required key and value types the cache must support.
+Transform any method declaration `declaration` so that calls to the original method are cached by their arguments. When an argument is unnamed, its type is treated as the argument instead. If the function is defined in local scope, each closure will have a separate cache.
 
-    If the given cache contains values, it is assumed that they will agree with the values the method returns. Specializing a method will not empty the cache, but overwriting a method will. You can look up or empty the cache with the functions `memories` and `forget!`.
+`cache` should be an expression which evaluates to a dictionary-like type that supports `get!` and `empty!`, and may depend on the local variables `__Key__` and `__Value__`, which evaluate to syntactically-determined bounds on the required key and value types the cache must support.
+
+If the given cache contains values, it is assumed that they will agree with the values the method returns. Specializing a method will not empty the cache, but overwriting a method will. You can look up or empty the cache with the functions `memories` and `forget!`.
+
+See also: [`memories`](@ref), [`forget!`](@ref)
 """
 macro memoize(args...)
     if length(args) == 1
@@ -184,8 +186,10 @@ end
 """
     memories(f, types::Type)
     
-    If the method `which(f, types)`, is memoized, return the cache in the
-    scope of `f`. Otherwise, return `nothing` or an overwritten cache.
+If the method `which(f, types)`, is memoized, return the cache in the
+scope of `f`. Otherwise, return `nothing` or an overwritten cache.
+
+See also: [`@memoize`](@ref), [`forget!`](@ref)
 """
 function memories(f, types)
     m = which(f, types)
@@ -207,8 +211,10 @@ end
 """
     memories(m::Method)
     
-    If m is a memoized method defined at global scope, return its cache.
-    Otherwise, return `nothing` or an overwritten cache.
+If m is a memoized method defined at global scope, return its cache.
+Otherwise, return `nothing` or an overwritten cache.
+
+See also: [`@memoize`](@ref), [`forget!`](@ref)
 """
 function memories(m::Method)
     if isdefined(m.module, Symbol(:bank, salt))
@@ -220,8 +226,10 @@ end
 """
     forget!(f, types::Type)
         
-    If the method `which(f, types)`, is memoized, `empty!` the cache in the
-    scope of `f`.
+If the method `which(f, types)`, is memoized, `empty!` the cache in the
+scope of `f`.
+
+See also: [`@memoize`](@ref), [`memories`](@ref)
 """
 function forget!(f, types::Type)
     c = memories(f, types)
@@ -235,7 +243,10 @@ end
 """
     forget!(m::Method)
         
-    If the method `m`, is memoized, `empty!` its cache.
+If the method `m`, is memoized, `empty!` its cache. To clear all memoized
+caches of a global method `f`, you can `map(forget!, methods(f))`.
+
+See also: [`@memoize`](@ref), [`memories`](@ref)
 """
 function forget!(m::Method)
     c = memories(m)
