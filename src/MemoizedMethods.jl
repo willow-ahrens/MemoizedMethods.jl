@@ -6,7 +6,11 @@ const salt = :__UYTBOOUDVEWICBEWNMDO__ #Symbol(:__, join(rand('A':'Z', 20)), :__
 
 # which($sig) becomes available in Julia 1.6, so here's a workaround
 function _which(tt, world=typemax(UInt))
-    meth = ccall(:jl_gf_invoke_lookup, Any, (Any, UInt), tt, world)
+    if VERSION < v"1.8.0-"
+        meth = ccall(:jl_gf_invoke_lookup, Any, (Any, UInt), tt, world)
+    else
+        meth = ccall(:jl_gf_invoke_lookup, Any, (Any, Any, UInt), tt, nothing, world)
+    end
     if meth !== nothing
         if meth isa Method
             return meth::Method
