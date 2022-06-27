@@ -5,7 +5,7 @@ authors = ["Peter Ahrens <pahrens@mit.edu>",
            "Cédric St-Jean <cedric.stjean@gmail.com>",
            "Kevin Squire <kevin.squire@gmail.com",
            "Contributors (https://github.com/JuliaCollections/Memoize.jl/graphs/contributors)"]
-version = "0.1.2"
+version = "0.1.3"
 
 [deps]
 MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
